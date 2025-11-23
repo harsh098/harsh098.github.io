@@ -1,0 +1,41 @@
+[[main]]
+none = "none"
+
+[[main]]
+name = "Work"
+pageRef = "/experience"
+identifier = "winK9428Gp"
+weight = 2
+
+[[main]]
+name = "About Me"
+pageRef = "/about"
+identifier = "aboutme"
+weight = 1
+
+[[main]]
+name = "Testimonials"
+pageRef = "/testimonials"
+identifier = "testimonials"
+weight = 2
+
+[[main]]
+name = "Articles"
+pageRef = "/articles"
+identifier = "articleItem"
+weight  = 3
+
+[[main]]
+name = "Talks"
+pageRef = "/talks"
+identifier = "talksNavItem"
+weight = 20
+
+[[main]]
+name = "Projects"
+pageRef = "/projects"
+identifier = "prjCTA"
+weight = 10_000
+
+[[footer]]
+none = "none"

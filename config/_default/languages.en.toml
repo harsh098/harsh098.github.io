@@ -1,0 +1,30 @@
+disabled = false
+languageCode = "en"
+languageName = "English"
+weight = 1
+title = "Harsh Mishra"
+
+[params]
+displayName = "EN"
+isoCode = "en"
+rtl = false
+dateFormat = "2 January 2006"
+description = "Everything between Infra, SRE, DevOps and Cloud"
+
+[[params.author.links]]
+github = "github.com/harsh098"
+
+[[params.author.links]]
+hashnode = "randomtinkering.hashnode.dev"
+
+[[params.author.links]]
+linkedin = "https://www.linkedin.com/in/hmx098"
+
+[[params.author.links]]
+x-twitter = "https://x.com/harsh_dev8086"
+
+["params.author"]
+headline = "Site Reliability Engineer @ One2N.io"
+image = "headshot.png"
+subtitle = "Cloud | DevOps | Infra"
+bio = "Hi, I'm Harsh. An Engineer, who loves infrastructure. For now, I work with anything that falls in between DevOps, SRE, Cloud and Infrastructure. I don't know what to do next. I'm eternally curious."
