@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://hmx86.cloud/sitemap.xml

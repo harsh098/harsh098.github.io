@@ -1,7 +1,0 @@
-baseURL = 'https://hmx86.cloud/'
-languageCode = 'en-us'
-title = 'Harsh Mishra'
-
-[caches]
-  [caches.images]
-    dir = ':cacheDir/images'
