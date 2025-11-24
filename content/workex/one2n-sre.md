@@ -16,7 +16,7 @@ _September 2025 - Present_
 5. Implemented Zero Trust architecture with RBAC using Cloudflare Zero Trust.
 6. Migrated publicly exposed back-office portals to private access through Cloudflare Zero Trust.
 7. Led the organization through a successful SOC2 Type II compliance process.
-8. Led efforts to make our platform deployable on end-customer's infrastructure - both cloud and on-prem for adoption by enterprise customers with strict compliance and data-residency requirements.
+8. Currently working with enterprise customers to deploy our SaaS product into their own AWS/on-prem environments, including network architecture design, secure IAM setup, and delivering Helm/Terraform-based installation and upgrade flows.
 
 ---
 
