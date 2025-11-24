@@ -12,10 +12,10 @@ dateFormat = "2 January 2006"
 description = "Everything between Infra, SRE, DevOps and Cloud"
 
 [[params.author.links]]
-github = "github.com/harsh098"
+github = "https://github.com/harsh098"
 
 [[params.author.links]]
-hashnode = "randomtinkering.hashnode.dev"
+hashnode = "https://randomtinkering.hashnode.dev"
 
 [[params.author.links]]
 linkedin = "https://www.linkedin.com/in/hmx098"
