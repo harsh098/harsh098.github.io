@@ -9,14 +9,13 @@ _September 2025 - Present_
 
 > DevOps and Cloud Infrastructure Consultant for an AI based Fraud Detection and AML Monitoring Startup
 
-1. Collaborating on performance optimization for workflows running on Netflix Conductor deployed on GKE.
-2. Automated software delivery for multi-tenant architectures using Terraform, reducing new environment setup time from 1 week to 1 day.
-3. Fixed CI/CD pipelines, reduced rollback times from 3 min to 30 seconds for GKE and GCE workloads.
-4. Achieved monthly savings of $4,000 through K8s resource and limit optimization to prevent node overprovisioning.
-5. Implemented Zero Trust architecture with RBAC using Cloudflare Zero Trust.
-6. Migrated publicly exposed back-office portals to private access through Cloudflare Zero Trust.
-7. Led the organization through a successful SOC2 Type II compliance process.
-8. Currently working with enterprise customers to deploy our SaaS product into their own AWS/on-prem environments, including network architecture design, secure IAM setup, and delivering Helm/Terraform-based installation and upgrade flows.
+1. *Accelerated Provisioning*: Leveraged Terraform and Pulumi to automate regional and BYOC (Bring Your Own Cloud) environment deployments. Reducing TAT for new infra from 1 week to 1 day.
+2. *Cost Optimization*: Saved $4.8k/mo by tuning Kubernetes requests and limits to eliminate over-provisioning of GKE Nodes.
+3. *Zero-Trust Security*: Secured back-office portals by implementing Cloudflare Zero Trust.
+4. *Rapid Recovery*: Reduced rollback time from 30 to 5 minutes by introducing optimized pipelines.
+5. *Multi-Cloud PaaS Architecture*: Led the re-architecture of the GCP based SaaS into a PaaS to support enterprise self-deployment across on-prem, AWS, GCP and Azure.
+6. *Data Warehousing and Analytics*: Led architecture planning for multi-tenancy and deployment of an end-to-end analytics platform based out of Starrocks Data Warehouse, Debezium and Kuberay on GKE
+7. *SOC2 Compliance*: Led infrastructure and development action items for SOC2 Type 2 certification.
 
 ---
 
@@ -24,14 +23,13 @@ _April 2025 - September 2025_
 
 > Site Reliability Engineer for a Mid-sized Fintech (Payments Platform similar to PayTM)
 
-1. Owned end-to-end reliability for 45+ services across 6 teams and 5 AWS environments; led migration from monolith to microservices for core payment functions.
-2. Provided production support for services built in Ruby on Rails, Spring Boot, and Go.
-3. Contributed to the design and rollout of an SLI/SLO framework for critical services and ETL pipelines.
-4. Implemented canary deployments for 27 services, improving release safety and reducing incident risk.
-5. Collaborated in decoupling Terraform IaC from CI/CD, supporting migration from AWS CodePipeline and reducing technical debt.
-6. Built Python CLI tools and GitHub Actions for configuration drift detection, reduced pre-deployment checks from 60 min to 10 sec to enable self-service for deployment owners.
-7. Reduced alert fatigue from 100 alerts per day to 4.
-8. Created incident runbooks and Datadog synthetic monitors for OTP and SMS reliability.
-9. Automated DB Lock resolution in Aurora Postgres using cron jobs.
-10. Developed custom Terraform PR Automation with Github Actions.
+1. *Production & Infra Support*: On-call and infrastructure ownership across 5 AWS environments for 45+ services during monolith-to-microservices migration.
+2. *Alerting*: Reduced PagerDuty alerts from 100/day to 4/day via signal and threshold tuning.
+3. *Reliability*: Implemented Datadog Synthetics to protect critical SMS/OTP authentication flows.
+4. *Automation*: Cut pre-deploy checks from 1 hour to 10 seconds using Python CLI and GitHub Actions.
+5. *12-Factor Architecture*: Refactored Ruby services with Shoryuken and Sidekiq on AWS SQS; isolated workers into separate containers for fault isolation and faster recovery.
+6. *IaC*: Decoupled Terraform from CI/CD and introduced a custom PR review workflow for infrastructure changes.
+7. *Deployments*: Rolled out Kubernetes canary releases for 27 high-traffic services.
+8. *Incident Management*: Designed SLI/SLOs to improve MTTD and MTTR.
+9. *Self-Healing*: Automated Aurora Postgres lock remediation, eliminating manual intervention.
 
