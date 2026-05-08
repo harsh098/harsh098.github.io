@@ -16,6 +16,8 @@ _September 2025 - Present_
 5. *Multi-Cloud PaaS Architecture*: Led the re-architecture of the GCP based SaaS into a PaaS to support enterprise self-deployment across on-prem, AWS, GCP and Azure.
 6. *Data Warehousing and Analytics*: Led architecture planning for multi-tenancy and deployment of an end-to-end analytics platform based out of Starrocks Data Warehouse, Debezium and Kuberay on GKE
 7. *SOC2 Compliance*: Led infrastructure and development action items for SOC2 Type 2 certification.
+8. *Monitoring*: Setup Monitoring for Infrastructure, CDC Pipelines and Data Warehouse (Starrocks) using
+Signoz. Synthetic Monitoring using Apache Superset for application performance.
 
 ---
 
