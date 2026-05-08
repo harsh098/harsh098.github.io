@@ -1,6 +1,6 @@
 ---
 title: "The Myth Of - You Don't Need Kubernetes"
-date: 2026-05-09
+date: 2026-05-08
 draft: false
 summary: "Don't Blame the Technology, Ask Questions Instead." 
 showTaxonomies: true 
