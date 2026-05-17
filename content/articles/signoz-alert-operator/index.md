@@ -144,8 +144,7 @@ spec:
     name: signoz-api-key
     key: api-key
 ```
-
-You don't have to hand-write `spec.rule` from scratch. The easiest workflow: build the rule once in the SigNoz UI, hit "Export JSON," paste under `spec.rule:`, swap to YAML formatting. Done.
+The spec for `spec.rule` is same as the request schema for [/api/v2/rules](https://signoz.io/api-reference/v0.124.0#/operations/CreateRule). 
 
 A handful of footguns worth knowing before you `kubectl apply`:
 
