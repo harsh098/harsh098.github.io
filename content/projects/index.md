@@ -22,6 +22,24 @@ layoutBackgroundHeaderSpace: false
 I always try to find time to work and learn something new. Usually, most of these _pet-projects_ don't see the light of day. They are, however, great opportunities to try something in the real world and learn from it.
 This is not an exhaustive list. There's a graveyard you can always visit on my [Github](https://github.com/harsh098).
 
+## Signoz Alert Operator
+{{<badge>}}
+Active
+{{</badge>}} 
+{{<button href="https://hmx86.cloud/articles/signoz-alert-operator">}}
+
+A Kubernetes Operator to manage alert rules for [Signoz](https://signoz.io) right from your Kubernetes Cluster.
+
+Supports:
+1. Automatic reconciliation from Kubernetes → SigNoz
+2. Full alert lifecycle: CREATE, UPDATE, DELETE
+3. Support for multiple Signoz from a single cluster
+4. Works with both SigNoz Cloud & Self Hosted.
+
+### Source
+{{< github repo="harsh098/signoz-alert-operator" showThumbnail=true >}}  
+
+
 ## Pychanio
 
 {{<badge>}}
