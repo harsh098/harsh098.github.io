@@ -27,6 +27,8 @@ This is not an exhaustive list. There's a graveyard you can always visit on my [
 Active
 {{</badge>}} 
 {{<button href="https://hmx86.cloud/articles/signoz-alert-operator">}}
+Read the announcement
+{{</button>}}
 
 A Kubernetes Operator to manage alert rules for [Signoz](https://signoz.io) right from your Kubernetes Cluster.
 
