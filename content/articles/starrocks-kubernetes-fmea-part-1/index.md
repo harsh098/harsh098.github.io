@@ -9,6 +9,8 @@ tags: ["k8s", "starrocks", "databases", "sre", "fmea"]
 
 {{< katex >}}
 
+> This post mirrors the [Data on Kubernetes Community article](https://dok.community/blog/starrocks-kubernetes-fmea-part-1/).
+
 > This is a two-part series on performing FMEA to test production readiness of Starrocks on GKE.
 
 ## Introduction
