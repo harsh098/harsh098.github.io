@@ -7,11 +7,9 @@ showTaxonomies: true
 tags: ["k8s", "starrocks", "databases", "sre", "fmea"]
 ---
 
-{{< katex >}}
-
 > This post mirrors the [Data on Kubernetes Community article](https://dok.community/blog/starrocks-kubernetes-fmea-part-1/).
 
-> This is a two-part series on performing FMEA to test production readiness of Starrocks on GKE.
+> This is a two-part series on performing FMEA to test production readiness of StarRocks on GKE.
 
 ## Introduction
 
@@ -21,7 +19,7 @@ We used [*Failure Modes and Effects Analysis*](https://www.youtube.com/watch?v=Z
 
 ## Audience and Key Takeaways
 
-This series is for SREs, Kubernetes administrators, and engineers evaluating a stateful system for production. You’ll learn what to understand about the system upfront, how to turn the guarantees your workload depends on into test cases, and how to scope the work to the time and resources you have. It takes a case study of [Starrocks](https://starrocks.io) - a data warehouse, walks through the FMEA Basics for this system in enough depth.
+This series is for SREs, Kubernetes administrators, and engineers evaluating a stateful system for production. You’ll learn what to understand about the system upfront, how to turn the guarantees your workload depends on into test cases, and how to scope the work to the time and resources you have. The series uses [StarRocks](https://starrocks.io), an open-source analytical data warehouse, as a case study and walks through the FMEA basics in enough depth to apply them to other stateful systems.
 
 ## What Is FMEA and Why Use It?
 
@@ -29,7 +27,7 @@ Failure Modes and Effects Analysis (FMEA) is a structured way to identify how a 
 
 We often evaluate databases with stress tests and benchmarks such as [YCSB](https://en.wikipedia.org/wiki/YCSB) or [TPC-C](https://www.tpc.org/tpcc/). These tell us how the system performs under load. Operational resilience raises a different set of questions. What happens if the leader disappears during a write? Can a restarted member rejoin? What does the client see when a partition leaves the cluster without quorum?
 
-For the readers who remain up-to-date with latest Cloud Native tech, would be aware of another term Chaos Engineering, which is very similar to FMEA, but has a very different focus altogether. We will avoid that rabbit hole for the time being. FMEA and Chaos Engineering share very similar goals in very different manner, in details, we wish not to discuss here.
+FMEA helps us decide which failures to test. It must not be confused with, [Chaos engineering](https://principlesofchaos.org/), which, uses controlled experiments on a running system to see how it responds to those failures.
 
 Testing every possible failure is rarely practical. I started with the guarantees our deployment depended on, then picked scenarios that could challenge each one. We ran those experiments directly because the scope was small. For a larger assessment, a framework like [Jepsen](https://jepsen.io/) can automate parts of the work.
 
@@ -99,103 +97,33 @@ These are assumptions about process behaviour, not Kubernetes workload types. [D
 
 `CrashLoopBackOff` indicates repeated container failures with delays between restart attempts. It does not represent crash-stop behaviour or guarantee that the database has failed safely. [Kubernetes pod lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)
 
-Similarly, competing leaders during a network partition do not automatically imply Byzantine behaviour. They may result from lost communication, stale leadership information, or an incorrect coordination mechanism.
+An FE that knowingly reports a metadata write as committed without obtaining a voting majority is an example of Byzantine behaviour. During a network partition, an isolated FE may still believe it is the leader because it cannot reach its peers. The partition test checks whether quorum safety holds under that loss of communication.
 
-### Network Models
+### Network and Timing Models
 
-Network models describe what processes can assume about message delivery.
+A network model describes what the system can assume about message delivery. In our frontend (FE) partition scenario, the isolated node cannot exchange messages with its voting peers, and a client timeout leaves the outcome of a write unknown. [Distributed systems lecture notes](https://www.cl.cam.ac.uk/teaching/2122/ConcDisSys/dist-sys-notes.pdf)
 
-| Model | Behaviour |
-|----|----|
-| **Arbitrary link** | Messages may be lost, altered, fabricated, or delivered unpredictably. |
-| **Fair-loss link** | Messages may be lost. If correct processes keep retransmitting, the link cannot discard every transmission forever. |
-| **Reliable link** | Messages between correct processes are eventually delivered without fabrication or duplicate delivery at the abstraction’s interface. Delivery has no fixed time bound. |
-
-Reliable delivery can be built over fair-loss links using retransmission and duplicate suppression, subject to the model’s assumptions. A permanent partition prevents delivery regardless of retries. [Distributed systems lecture notes](https://www.cl.cam.ac.uk/teaching/2122/ConcDisSys/dist-sys-notes.pdf)
-
-For database clients, a timeout leaves another question: did the operation fail, or did its response fail to arrive? Retrying a request therefore requires understanding its transaction and duplicate-handling semantics.
-
-### Timing Models
-
-Timing models describe the bounds an algorithm can assume for process execution and communication.
-
-| Model | Behaviour |
-|----|----|
-| **Synchronous** | Known upper bounds exist for processing and message-delivery delays. |
-| **Asynchronous** | The algorithm cannot rely on fixed upper bounds for processing or message-delivery delays. |
-| **Partially synchronous** | Bounds exist but are unknown, or known bounds become valid after an unknown stabilization time. |
-
-Partial synchrony is not simply a mixture of synchronous and asynchronous operations. It describes the timing assumptions under which a protocol must remain correct and eventually make progress. [Dwork, Lynch, and Stockmeyer](https://groups.csail.mit.edu/tds/papers/Lynch/jacm88.pdf)
-
-A delayed response cannot always distinguish a failed process from a slow or unreachable one. This is why timeouts, leader elections, and recovery behaviour matter when operating a distributed database.
+A timing model describes what the system can assume about how long processing and communication take. A slow response can look like a failed or unreachable process, so we check whether the majority can elect or retain a leader during the partition and whether the isolated FE catches up after communication returns. [Dwork, Lynch, and Stockmeyer](https://groups.csail.mit.edu/tds/papers/Lynch/jacm88.pdf)
 
 ## Consensus, Quorum, and Reconciliation
 
-Distributed systems often run the same service or store copies of the same data across multiple machines, commonly called **nodes**.
+![A three-node cluster accepts a proposed write of X = 7](consensus-quorum-reconciliation.png)
 
-This improves availability and fault tolerance. If one node becomes unavailable, another may continue serving requests.
+Suppose three nodes, A, B, and C, each store a copy of a value `X`. A client asks to change it from `10` to `7`. Three concepts describe how the cluster handles the write and how a member catches up after a disruption.
 
-However, distributing data across multiple nodes introduces an important challenge: **how do we ensure that these nodes agree on the state of the system, especially when some of them fail?**
-
-Three important concepts help us understand this problem: **Consensus, Quorum, and Reconciliation.**
-
-### Understanding the three concepts
-
-![A leader and two peers form a majority to commit a write](consensus-quorum-reconciliation.png)
-
-Imagine a distributed system with three nodes: A, B, and C. Each node maintains a copy of a value called `x`.
-
-Suppose the value of `x` changes from `10` to `20`. We want the system to agree on this change, even if one of the nodes becomes unavailable.
-
-This introduces three related but different concepts.
-
-**1. Consensus = How do nodes agree on a decision?**
-
-Consensus is the process through which nodes in a distributed system agree on a decision or value, even when some nodes fail or become unreachable.
-
-Think of it as a voting process. Nodes follow a set of rules to decide which proposed changes can be accepted.
-
-For example, nodes A, B, and C might participate in a consensus protocol to decide whether a particular update should be committed.
-
-**2. Quorum = How many nodes need to participate?**
-
-A quorum is the minimum set of participants required to satisfy a protocol's rules for making a decision or completing an operation.
-
-For example, a system with three voting nodes might require at least two of them to participate before committing a change.
-
-This is called a **majority quorum**.
-
-However, quorum and consensus are not the same thing. Quorum defines a participation requirement, while consensus defines the rules that allow nodes to safely agree on decisions.
-
-**3. Reconciliation = How do we bring nodes back into sync?**
-
-Reconciliation is the process of detecting differences between the actual and expected states of a system and taking corrective action.
-
-For example, suppose A and B have successfully committed the new value `x = 20`, but C was temporarily unavailable and still stores `x = 10`.
-
-When C becomes available again, it needs to catch up with the committed changes.
-
-This is an example of reconciliation.
-
-Reconciliation does not always require consensus. Some systems reconcile against a known desired state, while others use replication logs, version information, or other mechanisms to repair differences.
-
-In simple terms:
-
-- **Consensus:** Agree on what should happen.
-- **Quorum:** Determine how many participants are required.
-- **Reconciliation:** Bring the system's state into agreement with the accepted or desired state.
-
-These concepts often work together, but they solve different problems.
+- **Consensus** is how the nodes agree on which update to commit. In the diagram, A leads the protocol and proposes `X = 7`.
+- **Quorum** is the set of participants the protocol requires to complete an operation. Here, two of the three voting nodes are enough to form a majority.
+- **Reconciliation** brings actual state into line with the committed or desired state. If A and B commit `X = 7` while C is unavailable, C still has `X = 10`. When C returns, it catches up to `X = 7`.
 
 ### Understanding Majority Quorum
 
 Different distributed systems use different quorum rules. For simplicity, we'll focus on **majority quorum**, commonly used in leader-based consensus protocols.
 
-For a system with (N) voting members, a majority quorum requires:
+For a system with *N* voting members, a majority quorum requires:
 
-\(Q = \left\lfloor \frac{N}{2} \right\rfloor + 1\)
+**Q = ⌊N / 2⌋ + 1**
 
-Here, (N) represents the total number of voting members, and (Q) represents the minimum number needed for a majority.
+Here, *N* is the total number of voting members and *Q* is the minimum number needed for a majority.
 
 Consider three nodes: **A, B, and C**.
 
@@ -224,9 +152,9 @@ Notice something interesting: **a four-node cluster cannot tolerate more unavail
 
 Adding another voting member does not always improve fault tolerance.
 
-For a majority-based system to tolerate (f) unavailable members, the total number of voting members must satisfy:
+For a majority-based system to tolerate *f* unavailable members, the total number of voting members must satisfy:
 
-\(N \geq 2f + 1\)
+**N ≥ 2f + 1**
 
 For example, to tolerate two unavailable members, we need at least five voting members.
 
@@ -250,9 +178,13 @@ I deployed **StarRocks 3.5 in shared-nothing mode on GKE** using the StarRocks K
 | **Workloads**     | StatefulSets with persistent volumes               |
 | **FE resources**  | 2 CPUs, 4 GiB RAM, 100 GiB metadata storage        |
 | **BE resources**  | 4 CPUs, 16 GiB RAM, 100 GiB data storage           |
-| **Storage class** | `premium-rwo`                                      |
-| **Placement**     | Topology spreading by hostname (1 GKE Node-per-AZ) |
+| **Storage class** | `premium-rwo` with zonal persistent disks |
+| **Placement**     | FE and BE replicas spread by `kubernetes.io/hostname`, with one GKE worker per zone in the test pool |
 | **Replication**   | 3 replicas, majority write quorum                  |
+
+Zone separation in this test came from the one-worker-per-zone layout. A topology spread constraint can use `topology.kubernetes.io/zone` to count replicas by zone. An FE and a BE can share a worker, so losing that worker can take out one member of each group. [Kubernetes topology spread constraints](https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/)
+
+A pod can reuse its zonal disk only on a worker in the disk's zone. If a drain or worker failure leaves no eligible worker in that zone, the replacement pod can stay `Pending` even when other zones have capacity. [GKE persistent volumes](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/persistent-volumes)
 
 StarRocks separates responsibilities between two components:
 
@@ -277,7 +209,7 @@ There are three FE roles:
 
 Our deployment had **three voting FEs (including the leader)**, requiring a majority of two.
 
-\[N=3,\quad Q=2\]
+**N = 3, Q = 2**
 
 This means:
 
@@ -367,7 +299,11 @@ I started with the guarantees I expected from our StarRocks deployment on GKE. F
 
 I assessed the FE metadata quorum and the BE tablet write quorum separately. In our deployment, each had a threshold of two out of three, but they counted different things. The FE check concerned voting members that could communicate and participate in metadata consensus. The BE check concerned successful write acknowledgments from replicas of **each affected tablet**. A load succeeding while one BE was unavailable could demonstrate continued write availability. Recovery required a separate check that the BE rejoined and its replicas became healthy again.
 
-I grouped the scenarios by what could go wrong and what I expected to observe.
+I grouped the scenarios by what could go wrong, what I expected to observe, and which failure assumptions each test used.
+
+We ran the experiment with StarRocks Operator v1.11.1, which managed the FE and BE StatefulSets through the `StarRocksCluster` custom resource. That version provided no way to configure PodDisruptionBudgets (PDBs) through the custom resource. For the planned-drain scenario, we checked whether the remaining FEs could maintain a voting majority and whether writes could still reach quorum for each affected tablet. [StarRocksCluster resource definition in v1.11.1](https://github.com/StarRocks/starrocks-kubernetes-operator/blob/v1.11.1/config/crd/bases/starrocks.com_starrocksclusters.yaml)
+
+In the password rotation scenario, the BE startup script uses a MySQL client to connect to the FE as the StarRocks `root` user and register the backend. In our deployment, we had to inject the current root password separately into the BE container as `MYSQL_PWD`, sourced from a Kubernetes Secret. Changing the password in StarRocks does not update that environment variable. A running BE may keep serving while a replacement with a missing or stale value fails to authenticate and register. [StarRocks Operator password rotation guide](https://github.com/StarRocks/starrocks-kubernetes-operator/blob/v1.11.4/doc/change_root_password_howto.md)
 
 <table>
 <colgroup>
@@ -381,7 +317,7 @@ I grouped the scenarios by what could go wrong and what I expected to observe.
 <th>Scenario</th>
 <th>What could go wrong</th>
 <th>What I would check</th>
-<th scope="col">Expected Working Model</th>
+<th scope="col">Assumed failure model</th>
 </tr>
 </thead>
 <tbody>
@@ -389,42 +325,32 @@ I grouped the scenarios by what could go wrong and what I expected to observe.
 <td><strong>FE follower or leader pod disappears</strong></td>
 <td>The FE group loses a member, and losing the leader can interrupt metadata operations.</td>
 <td>Check whether the remaining voters retain a majority, whether they elect a new leader when needed, and whether the replacement FE rejoins.</td>
-<td>Crash Recovery must happen.</td>
+<td>Node: crash-recovery</td>
 </tr>
 <tr>
 <td><strong>A GKE worker is drained or abruptly replaced</strong></td>
 <td>A member may fail to recover after its pod is replaced, even when its persistent volume survives.</td>
-<td>Treat planned drain and abrupt loss as separate cases. Check whether the replacement starts with usable state and returns to database membership.</td>
-<td><ul>
-<li>No Byzantine Behaviour.</li>
-<li>Crash Stop if Metadata Corrupted.</li>
-</ul></td>
+<td>Treat planned drain and abrupt loss as separate cases. Check whether the replacement can schedule in the disk’s zone, start with usable state, and rejoin the cluster.</td>
+<td>Node: crash-stop (abrupt worker loss)<br>Node: crash-recovery (database member)</td>
 </tr>
 <tr>
 <td><p><strong>An FE is isolated from its voting peers</strong></p>
 <p><strong>(Network Partition)</strong></p></td>
 <td>An isolated leader could keep acting on stale leadership information, or clients could continue sending requests to an unreachable member.</td>
-<td>Check whether the majority can elect or retain a leader, whether the isolated side can commit new metadata changes, and whether the isolated member rejoins after connectivity returns.</td>
-<td><ul>
-<li>No Byzantine Behaviour</li>
-</ul></td>
+<td>Check that the majority can elect or retain a leader. Verify that the isolated FE can neither commit a new metadata write nor report it as committed without a voting majority. Check that the isolated FE rejoins after connectivity returns.</td>
+<td>Node: Byzantine Behaviour (minority FE starts accepting writes) <br>Network: partition (link omission)</td>
 </tr>
 <tr>
 <td><strong>A BE becomes unavailable</strong></td>
 <td>An affected tablet may have too few healthy replicas to satisfy its write quorum.</td>
 <td>Check whether loads can succeed with the remaining replicas and whether the cluster restores the intended replica count after recovery.</td>
-<td><ul>
-<li>Crash Recovery must happen</li>
-</ul></td>
+<td>Node: crash-recovery</td>
 </tr>
 <tr>
-<td><strong>BEs restart after a credential change</strong></td>
-<td>Existing members may keep serving while a replacement fails to authenticate with stale credentials.</td>
-<td>Restart one member first and check whether it can register. Assess what happens to write availability if further members restart before the first recovers.</td>
-<td><ul>
-<li>No Byzantine Behaviour. </li>
-<li>Crash Recovery is expected.</li>
-</ul></td>
+<td><strong>BEs restart after a root password rotation</strong></td>
+<td>Running BEs may keep serving while a replacement fails to register because its <code>MYSQL_PWD</code> is missing or stale.</td>
+<td>Restart one BE first and check whether it can authenticate and register with the FE. Check whether tablet writes can still meet quorum if more BEs restart before the first recovers.</td>
+<td>Node: crash-recovery</td>
 </tr>
 </tbody>
 </table>
