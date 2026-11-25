@@ -7,8 +7,6 @@ showTaxonomies: true
 tags: ["k8s", "starrocks", "databases", "sre", "fmea"]
 ---
 
-> This post accompanies the [Data on Kubernetes Community series](https://dok.community/blog/starrocks-kubernetes-fmea-part-1/).
-
 In Part 1, we used failure modes and effects analysis (FMEA) to ask what could interrupt StarRocks on GKE. Here we set up the lab, test one fault at a time, and check how the cluster recovers. [Read Part 1](https://dok.community/blog/starrocks-kubernetes-fmea-part-1/).
 
 This article is for SREs and Kubernetes engineers who test stateful workloads. We check what the client sees, whether a member rejoins, and whether the table gets all its replicas back.
@@ -106,7 +104,6 @@ We use the invariants above to define each test. Before each fault, we verify th
 | Credential rotation | CRED-1 | Start ESO with a one-hour refresh interval. Rotate the database and provider passwords. Confirm the target Secret is stale, then restart one BE. Record the failure before applying the fix. | Credential synchronization delay exposed by BE Crash-Recovery. | The replacement BE authenticates and returns to service without a forced sync or another restart. All affected tablets regain three healthy replicas. | The replacement BE reads the old password and cannot authenticate or return to service. This is the expected failure of the rotation workflow. |
 | Planned maintenance | SURGE-1 | Run continuous write probes during an actual GKE surge upgrade. Compare worker, pod, and volume identities, then check acknowledged rows and tablet health. | Planned worker replacement and FE/BE Crash-Recovery. | All acknowledged inserts remain readable. All three FEs and BEs recover, each tablet regains three healthy replicas, and the six database volume bindings remain intact. | An acknowledged insert disappears, a member cannot rejoin, a database volume binding is lost, or tablet redundancy fails to recover. |
 
-For CRED-1, recovery follows the failed test. We force ESO to sync, verify the target Secret, and replace the affected BE container. We then check registration, acknowledged rows, and three healthy replicas per affected tablet. Successful recovery completes the remediation. The original test verdict remains **FAIL**.
 
 The forced pod exits exercise database process Crash-Recovery. The surge test uses the separately recorded GKE worker upgrade. For any client timeout, we check the operation after recovery before we assign its outcome.
 
@@ -278,7 +275,7 @@ Storage: same PVC claims; replacement pod has a new UID.
 Status: PASS
 ```
 
-The tablet checks recorded the following states.
+The tablet checks recorded the following states. This can be manually verified by running `ADMIN SHOW REPLICA STATUS`
 
 | Check | Healthy replicas | DEAD replicas |
 | --- | --- | --- |
@@ -334,7 +331,7 @@ Write with two BEs: acknowledged.
 
 ### Identified Risks
 
-A shorter polling interval still leaves a stale Secret window. An ESO outage can extend it. Several failed BE restarts can remove write quorum.
+A shorter polling interval still leaves a stale Secret window, and is not a permanent fix. In a scenario where an ESO outage occurs during this interval, can also reproduce the same failure mode. Several failed BE restarts can remove write quorum. It is advised to keep backups handy and force sync ESO `ExternalSecret` as shown below.
 
 ### Fix
 
@@ -353,13 +350,6 @@ kubectl -n starrocks delete pod starrocks-fmea-be-0 --wait=false
 ```
 
 The runner checks the acknowledged row and all tablet replicas before restoring the original credential.
-
-```text
-Fix: forced ESO sync; target Secret matches the rotated password.
-Recovery: BE registered, acknowledged row present, all 12 replicas OK.
-Status: FAIL — stale credentials prevented BE restart.
-Fix: verified; original credential and baseline restored.
-```
 
 ## Conclusion
 
@@ -390,5 +380,3 @@ CRED-1 failed because the replacement BE read a stale password and could not aut
 2. **Upgrades need a scale-up and scale-down plan.** Make replacement capacity available in the disk's zone before removing a worker. Replace members in controlled steps. Check membership and tablet health before proceeding.
 
 3. **Reserve a two-to-three-minute maintenance window for GKE upgrades.** This is our operating allowance for the workload. In our seven months of production experience, the cluster became available again in approximately two to three seconds after the interruptions we encountered. That brief interruption was acceptable for us. FE metadata recovery can take longer if BDB JE state is invalid or metadata is damaged, so we prefer blue-green upgrades for planned maintenance.
-
-4. **Use batch ingestion and a replayable source.** For analytical workloads, prefer batch writes through Stream Load. Its asynchronous Merge Commit mode can accept data before the merged transaction finishes, so verify the final transaction status. For continuous ingestion, Kafka with Routine Load provides an asynchronous path. Keep source data long enough to replay batches during recovery, and design retries to avoid duplicate rows. [Stream Load](https://docs.starrocks.io/docs/loading/StreamLoad/), [Kafka Routine Load](https://docs.starrocks.io/docs/loading/kafka/RoutineLoad/).
