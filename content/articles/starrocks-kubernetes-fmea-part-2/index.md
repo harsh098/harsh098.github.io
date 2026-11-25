@@ -102,10 +102,9 @@ We use the invariants above to define each test. Before each fault, we verify th
 | FE quorum safety | FE-3 | Isolate the leader's zone from the other database pods. Verify DNS and connectivity. Attempt distinct metadata changes on both sides and a data write on the majority side. Remove the partition and check recovery. | Network partition through link omission. Check for Split Brain and the Byzantine behaviour described in the invariants. | Majority-side metadata and data writes succeed. The minority reports no committed metadata change. Its rejected probe remains absent after recovery. All members and tablet replicas recover. | A minority FE confirms a metadata commit without two voters, both sides commit conflicting metadata, an acknowledged write disappears, or membership and replicas fail to recover. |
 | BE availability and recovery | BE-1 | Cordon one worker and force-delete its BE pod. Confirm that StarRocks marks the BE down. Insert a unique row, then uncordon and check recovery. | BE process Crash-Recovery with one unavailable replica per affected tablet. | The insert succeeds with two healthy replicas per affected tablet. The row remains readable after recovery. All three BEs are alive, and every tablet has three healthy replicas on distinct BEs. | The insert fails despite two healthy replicas per affected tablet, the acknowledged row disappears, the BE cannot rejoin, or any replica remains unhealthy. |
 | Credential rotation | CRED-1 | Start ESO with a one-hour refresh interval. Rotate the database and provider passwords. Confirm the target Secret is stale, then restart one BE. Record the failure before applying the fix. | Credential synchronization delay exposed by BE Crash-Recovery. | The replacement BE authenticates and returns to service without a forced sync or another restart. All affected tablets regain three healthy replicas. | The replacement BE reads the old password and cannot authenticate or return to service. This is the expected failure of the rotation workflow. |
-| Planned maintenance | SURGE-1 | Run continuous write probes during an actual GKE surge upgrade. Compare worker, pod, and volume identities, then check acknowledged rows and tablet health. | Planned worker replacement and FE/BE Crash-Recovery. | All acknowledged inserts remain readable. All three FEs and BEs recover, each tablet regains three healthy replicas, and the six database volume bindings remain intact. | An acknowledged insert disappears, a member cannot rejoin, a database volume binding is lost, or tablet redundancy fails to recover. |
 
 
-The forced pod exits exercise database process Crash-Recovery. The surge test uses the separately recorded GKE worker upgrade. For any client timeout, we check the operation after recovery before we assign its outcome.
+The forced pod exits exercise database process Crash-Recovery. For any client timeout, we check the operation after recovery before we assign its outcome.
 
 
 
@@ -188,7 +187,7 @@ Status: PASS
 
 BDB JE stores replication state in the FE metadata directory, configured through `meta_dir` and often mounted as `fe_meta`. A stale FE must catch up with the leader. An invalid BDB JE environment or damaged metadata can prevent the FE from starting or rejoining. Preserve the metadata directory before attempting recovery. [StarRocks metadata recovery](https://docs.starrocks.io/docs/administration/Meta_recovery/).
 
-For planned GKE maintenance, we prefer blue-green upgrades over the default surge strategy. Blue-green creates replacement capacity before draining the old pool and provides batch and pool soak periods. Use that time to check FE membership, metadata writes, and tablet recovery before continuing. Our lab exercised surge upgrades. The blue-green preference follows its maintenance controls. [GKE upgrade strategies](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/node-pool-upgrade-strategies).
+For planned GKE maintenance, we prefer blue-green upgrades over the default surge strategy. Blue-green creates replacement capacity before draining the old pool and provides batch and pool soak periods. Use that time to check FE membership, metadata writes, and tablet recovery before continuing. [GKE upgrade strategies](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/node-pool-upgrade-strategies).
 
 ### Status
 
@@ -359,13 +358,11 @@ These tests let us examine Safety, Availability, and Recovery separately. The cl
 
 The connected FE majority committed metadata changes during the partition. The isolated FE refused the SQL connection, and its probe database was absent after recovery. We observed no Split Brain in this run.
 
-The acknowledged inserts remained readable after recovery. In the separate surge run, all 279 acknowledged inserts survived worker replacement. These observations support the tested quorum and write-retention expectations.
+The acknowledged inserts remained readable after recovery. This met our write-retention requirement for the tested disruptions.
 
 ### Availability
 
 The cluster accepted metadata writes with one voting FE unavailable. When the leader disappeared, the remaining voters elected a replacement. Existing-table writes also succeeded with one BE down and two replicas available per affected tablet.
-
-Availability depended on the operation. During the surge run, two direct SQL requests failed around leader handoff. Creating a three-replica table also failed while only two BEs were available, although existing-table majority writes could succeed.
 
 ### Recovery
 
