@@ -151,9 +151,6 @@ Status: PASS
 
 **PASS.** The client probe succeeded during the outage, and the database recovered.
 
-### Identified Risks
-
-A force-delete response does not establish when the old process stopped. The script checks StarRocks membership before the write probe.
 
 ## FE-2 : Leader recovery
 
@@ -202,7 +199,7 @@ For planned GKE maintenance, we prefer blue-green upgrades over the default surg
 
 ### Identified Risks
 
-A leader handoff can interrupt a client request. Check the operation after recovery before deciding whether to retry.
+A leader re-election and failover can briefly drop TCP connections which may interrupt client requests. Given Starrocks does not support Transactional DDL, keep backups handy to avoid broken schema state in case an outage occurs during a Schema change. This is rare, but a perfectly possible failure mode when running a DB on Kubernetes.
 
 ## FE-3 : Leader isolation
 
@@ -294,7 +291,7 @@ The tablet checks recorded the following states.
 
 ### Identified Risks
 
-The cluster has only two available replicas per affected tablet during this outage. Another unavailable replica can prevent majority writes.
+The cluster has only two available replicas per affected tablet during this outage. Another unavailable replica can prevent majority writes. In a cluster of N nodes, we can find the max failures using  the relation N ≥ 2f + 1, which means, for a cluster of 3 nodes, atleast 2 nodes need to be available. 
 
 ## CRED-1 : Password rotation
 
